@@ -1,0 +1,12 @@
+// Lint gate for docs synced to Confluence (mark pipeline).
+// Contract rules only: the H1 is the Confluence page title, so it must exist,
+// be first, and be unique in the file. Prose-style rules stay off on purpose.
+// Copy to the doc repo root as .markdownlint-cli2.jsonc; run:
+//   npx --yes markdownlint-cli2@0 "docs/**/*.md"   (root-mode repos: "**/*.md")
+{
+  "config": {
+    "default": false,
+    "MD025": true, // single H1 per file (title uniqueness within the file)
+    "MD041": true  // first line must be the H1 (title extraction contract)
+  }
+}
