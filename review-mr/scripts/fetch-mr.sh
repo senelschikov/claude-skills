@@ -2,13 +2,38 @@
 # Fetch a GitLab MR (by number or source branch) from the repo's origin and
 # print what is under review: commits, diffstat, base. Needs only git.
 #
-# Usage: fetch-mr.sh <mr-number|branch> [repo-dir]
-# Exit:  0 found · 2 not found in this repo · 1 usage/git error
+# Usage: fetch-mr.sh <mr-number|branch|mr-url> [repo-dir]
+# An MR URL (https://host/group/project/-/merge_requests/254[/diffs...]) names the project too:
+# the clone is looked up as repo-dir itself, then its sibling directories, by origin.
+# Exit:  0 found · 2 not found in this repo (or no local clone of the URL's project) · 1 usage/git error
 set -euo pipefail
+. "$(dirname "$0")/gitlab-lib.sh"
 
-target="${1:?usage: fetch-mr.sh <mr-number|branch> [repo-dir]}"
+target="${1:?usage: fetch-mr.sh <mr-number|branch|mr-url> [repo-dir]}"
 repo="${2:-.}"
 target="${target#!}"; target="${target#\#}"   # accept !254 / #254
+
+lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+if [[ "$target" =~ ^https?://([^/]+)/(.+)/merge_requests/([0-9]+) ]]; then
+  url_host=$(lower "${BASH_REMATCH[1]}"); url_path=$(lower "${BASH_REMATCH[2]%/-}")
+  target=${BASH_REMATCH[3]}
+  top=$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null || (cd "$repo" && pwd))
+  found=""
+  for d in "$top" "$(dirname "$top")"/*/; do
+    d=${d%/}
+    git -C "$d" rev-parse --git-dir >/dev/null 2>&1 || continue
+    gl_origin_parse "$d" 2>/dev/null || continue
+    if [ "$(lower "$GL_HOST")" = "$url_host" ] && [ "$(lower "$GL_PATH")" = "$url_path" ]; then found=$d; break; fi
+  done
+  if [ -z "$found" ]; then
+    echo "NO_LOCAL_CLONE: $url_host/$url_path (looked in $top and its siblings)"
+    echo "CLONE_URL: https://$url_host/$url_path.git"
+    exit 2
+  fi
+  repo=$found
+  echo "FROM_URL:    !$target in $url_host/$url_path"
+  echo "REPO_DIR:    $repo"
+fi
 g() { git -C "$repo" "$@"; }
 
 g rev-parse --git-dir >/dev/null

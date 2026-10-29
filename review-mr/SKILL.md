@@ -1,6 +1,6 @@
 ---
 name: review-mr
-description: Find a GitLab merge request in the current repo by number (!254, "MR 254", "mr #254") or by source branch, fetch it with plain git, and review its changes with the `review` skill. Use whenever the user asks to review, check, look at or give an opinion on an MR / merge request / branch that lives on GitLab (gitlab.advsys.work), including terse asks like "review mr 254", "glance at !31", "check branch fix/foo" or Russian "посмотри MR". Also use it to read and triage the review comments already on an MR ("check the comments on !254", "evaluate the review"), and to post a finished review or a reply to a thread as a GitLab comment, which it does only when the user explicitly asks ("post it", "comment on the MR"). This is the front end for `review`, which defines how the review itself is done.
+description: Find a GitLab merge request by link (https://gitlab.../-/merge_requests/254), or in the current repo by number (!254, "MR 254", "mr #254") or by source branch, fetch it with plain git, and review its changes with the `review` skill. Use whenever the user asks to review, check, look at or give an opinion on an MR / merge request / branch that lives on GitLab (gitlab.advsys.work), including terse asks like "review mr 254", "glance at !31", "check branch fix/foo" or Russian "посмотри MR". Also use it to read and triage the review comments already on an MR ("check the comments on !254", "evaluate the review"), and to post a finished review or a reply to a thread as a GitLab comment, which it does only when the user explicitly asks ("post it", "comment on the MR"). This is the front end for `review`, which defines how the review itself is done.
 ---
 
 # Review MR
@@ -12,11 +12,18 @@ step 1 onward. Do not write a lighter review of your own instead.
 ## 1. Fetch the MR from the current repo
 
 The MR belongs to the repo of the session's working directory, i.e. its `origin` remote. Run the
-bundled script with the number, or with the branch name if that is all the user gave:
+bundled script with the number, the branch name if that is all the user gave, or the MR link
+(`https://<host>/<group>/<project>/-/merge_requests/<N>`, any `/diffs`, `#note_…` suffix is fine):
 
 ```bash
-bash ~/.claude/skills/review-mr/scripts/fetch-mr.sh <number|branch> <repo-dir>
+bash ~/.claude/skills/review-mr/scripts/fetch-mr.sh <number|branch|mr-url> <repo-dir>
 ```
+
+A link names the project, so it settles which repo is meant (step 2 does not apply). The script
+finds the clone whose `origin` is that project, checking `<repo-dir>` and then its sibling
+directories, and prints `REPO_DIR:`. Use that dir and the MR number from the link as `<repo-dir>`
+and `<N>` for every later script call. On `NO_LOCAL_CLONE` (exit 2), ask the user where the clone
+is, or offer to clone `CLONE_URL` into the scratchpad and review there.
 
 It needs only git (`glab`, `jq` and Python on PATH are not available here). It fetches
 `refs/merge-requests/<N>/head` and prints the commits, diffstat, merge-base and the source
