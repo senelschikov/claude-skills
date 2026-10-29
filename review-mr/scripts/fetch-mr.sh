@@ -5,8 +5,10 @@
 # Usage: fetch-mr.sh <mr-number|branch|mr-url> [repo-dir]
 # An MR URL (https://host/group/project/-/merge_requests/254[/diffs...]) names the project too:
 # the clone is looked up as repo-dir itself, then its sibling directories, by origin.
-# Exit:  0 found · 2 not found in this repo (or no local clone of the URL's project) · 1 usage/git error
+# Exit:  0 found · 2 not found in this repo (or no local clone of the URL's project)
+#        · 1 usage/git error, or origin unreachable (REMOTE_UNREACHABLE)
 set -euo pipefail
+export GIT_TERMINAL_PROMPT=0   # fail instead of hanging on a credential prompt
 . "$(dirname "$0")/gitlab-lib.sh"
 
 target="${1:?usage: fetch-mr.sh <mr-number|branch|mr-url> [repo-dir]}"
@@ -51,7 +53,12 @@ else
   local_ref="refs/remotes/origin/$target"
 fi
 
-head_sha=$(g ls-remote origin "$ref" 2>/dev/null | cut -f1)
+if ! ls_out=$(g ls-remote origin "$ref" 2>&1); then
+  echo "REMOTE_UNREACHABLE: $origin (git ls-remote failed: network/VPN or git credentials)"
+  printf '%s\n' "$ls_out" | tail -2 | sed 's/^/  /'
+  exit 1
+fi
+head_sha=$(printf '%s\n' "$ls_out" | awk -v r="$ref" '$2 == r {print $1}')
 if [ -z "$head_sha" ]; then
   echo "NOT_FOUND: $ref in $origin"
   if [[ "$target" =~ ^[0-9]+$ ]]; then

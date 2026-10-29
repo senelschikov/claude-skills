@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Post a markdown file as one comment (note) on a GitLab MR of the repo's origin, or as a reply
-# in an existing discussion thread (--discussion <id>, from fetch-mr-discussions.ps1).
+# in an existing discussion thread (--discussion <id>, from fetch-mr-discussions.sh).
 # Token: see gitlab-lib.sh (`api` scope for posting); never printed. Needs bash, git and curl.
 #
 # Usage: post-mr-note.sh <mr-number> <body.md> [repo-dir] [--discussion <id>] [--dry-run]
@@ -40,7 +40,7 @@ echo "TARGET: $web ($where)"
 echo "BODY:   $body ($(wc -c <"$body") bytes)"
 if [ "$dry" = 1 ]; then echo "DRY_RUN: nothing posted"; exit 0; fi
 
-gl_header_file || { echo "NO_TOKEN: set GITLAB_TOKEN (scope: api) at Windows user level and retry"; exit 3; }
+gl_header_file || { echo "NO_TOKEN: $(gl_no_token_hint api)"; exit 3; }
 
 resp=$(curl -sS -w '\n%{http_code}' -X POST "$api" -H @"$GL_HEADER_FILE" --data-urlencode "body@$body")
 code=${resp##*$'\n'}; resp=${resp%$'\n'*}

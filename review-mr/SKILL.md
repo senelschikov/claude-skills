@@ -25,15 +25,19 @@ directories, and prints `REPO_DIR:`. Use that dir and the MR number from the lin
 and `<N>` for every later script call. On `NO_LOCAL_CLONE` (exit 2), ask the user where the clone
 is, or offer to clone `CLONE_URL` into the scratchpad and review there.
 
-It needs only git (`glab`, `jq` and Python on PATH are not available here). It fetches
-`refs/merge-requests/<N>/head` and prints the commits, diffstat, merge-base and the source
-branches that point at the MR head.
+It needs only git. It fetches `refs/merge-requests/<N>/head` and prints the commits, diffstat,
+merge-base and the source branches that point at the MR head. `REMOTE_UNREACHABLE` (exit 1) means
+git could not talk to the origin at all (VPN, network or git credentials): say so, don't retry in
+a loop, and don't report the MR as missing.
 
 **Then read the MR through the API, if a token exists** (read-only):
 
 ```bash
-powershell.exe -NoProfile -File "$(cygpath -w ~/.claude/skills/review-mr/scripts/fetch-mr-discussions.ps1)" -Mr <N> -Repo <repo-dir> [-JsonOut <scratchpad>/mr<N>.json]
+bash ~/.claude/skills/review-mr/scripts/fetch-mr-discussions.sh <N> <repo-dir> [--json-out <scratchpad>/mr<N>.json]
 ```
+
+The script detects the OS: on macOS and Linux it uses curl + jq, on Windows (Git Bash, no jq) it
+runs `fetch-mr-discussions.ps1` through `powershell.exe`. The output is the same either way.
 
 It prints the real target and source branch, state, head SHA, description size, and every review
 thread with `file:line`, resolved state, the commit it was written against and its discussion id.
@@ -47,11 +51,20 @@ exception (e.g. it targets `dev` or a release branch), re-diff against that bran
 
 ### GitLab token
 
-Both API scripts look for `GITLAB_TOKEN` (or `GL_TOKEN`) in the environment, and then for the
-Windows **user-level** `GITLAB_TOKEN`, read at the moment of the call. The session does not need
-a restart. `read_api` scope is enough to read, posting needs `api`. If it is missing (exit 3), tell
-the user to run this in their own PowerShell, not via `!` in the chat, because that would put the
-token in the transcript:
+The API scripts look for `GITLAB_TOKEN` (or `GL_TOKEN`) in the environment, and then in an OS
+store read at the moment of the call, so the session does not need a restart: the Windows
+**user-level** `GITLAB_TOKEN`, or on macOS the login Keychain (service `GITLAB_TOKEN`). `read_api`
+scope is enough to read, posting needs `api`. If it is missing (exit 3, the `NO_TOKEN` line names
+the OS-specific fix), tell the user to run the command in their own terminal, not via `!` in the
+chat, because that would put the token in the transcript.
+
+macOS (prompts for the token, so it never lands in shell history):
+
+```bash
+security add-generic-password -U -a "$USER" -s GITLAB_TOKEN -w
+```
+
+Windows PowerShell:
 
 ```powershell
 [Environment]::SetEnvironmentVariable('GITLAB_TOKEN', '<token>', 'User')
@@ -59,8 +72,8 @@ token in the transcript:
 [Environment]::SetEnvironmentVariable('GITLAB_TOKEN', $env:GITLAB_TOKEN, 'User')
 ```
 
-`$env:GITLAB_TOKEN = …` alone lives only in that one terminal and is invisible here. Never ask
-for the token in the chat, and never print it.
+`$env:GITLAB_TOKEN = …` (or `export` in a terminal) alone lives only in that one terminal and is
+invisible here. Never ask for the token in the chat, and never print it.
 
 If the user gives both a number and a branch, check that the branch's head SHA appears among the
 `SOURCE_BRANCHES` of the MR head. A mismatch means they are talking about two different things,
@@ -105,7 +118,7 @@ Load the `review` skill and run it on the `merge-base..mr/<N>` range from step 1
 ## 3b. Triage existing review comments
 
 When the user asks to check, evaluate or answer the comments already on an MR (rather than to
-review it), fetch the threads with `fetch-mr-discussions.ps1` and check each one against the code
+review it), fetch the threads with `fetch-mr-discussions.sh` and check each one against the code
 **at the commit the comment was written against** and at the MR head. Verify claims before
 agreeing: read the code path, check other repos or master for code the comment cites, and run a
 quick experiment where one settles it. Give each thread one verdict:
