@@ -1,0 +1,17 @@
+{
+  "name": "comment-guard",
+  "version": "0.2.0",
+  "description": "Denies long or dense comment runs and long commit bodies before they land",
+  "author": {
+    "name": "Vladislav Cherkasov"
+  },
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Judge Edit, Write and Bash calls for long or dense comments and long commit bodies",
+      "default": true
+    }
+  },
+  "types": "./types/index.d.ts"
+}
