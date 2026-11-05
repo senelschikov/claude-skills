@@ -1,6 +1,6 @@
 ---
 name: review
-description: Correctness review of code changes — find the bugs a careful senior engineer would find by reading, not just check that it compiles or tests pass. Use whenever asked to review, check, look over, sanity-check or give an opinion on a commit, MR/PR, branch or diff: a colleague's commit, an MR into master, or my own branch before opening the MR. ALSO use, without being asked, whenever moving, restoring, cherry-picking, porting or re-applying code between branches or commits: code that "landed intact" is not code that is correct, and a move must not be reported done until the moved code is reviewed or explicitly flagged as unreviewed. When the code was written in this session, the review runs in a fresh-context subagent. Has domain checklists (Airflow DAGs / data pipelines; Ansible / deployed scripts; Prometheus exporters and alert rules).
+description: Correctness review of code changes — find the bugs a careful senior engineer would find by reading, not just check that it compiles or tests pass. Use whenever asked to review, check, look over, sanity-check or give an opinion on a commit, MR/PR, branch or diff: a colleague's commit, an MR into master, or my own branch before opening the MR. ALSO use, without being asked, whenever moving, restoring, cherry-picking, porting or re-applying code between branches or commits: code that "landed intact" is not code that is correct, and a move must not be reported done until the moved code is reviewed or explicitly flagged as unreviewed. When the code was written in this session, the review runs in a fresh-context subagent. Checks the change against its Jira ticket when one can be found and fetched. Has domain checklists (Airflow DAGs / data pipelines; Ansible / deployed scripts; Prometheus exporters and alert rules).
 ---
 
 # Review
@@ -50,6 +50,28 @@ code and set aside as a "known limitation" belongs in the findings. Do not leave
   file*, so review the whole file as new code. Also check that you moved the newest version that
   exists anywhere (`git log --all -- <path>`), and what the target already has (deps, versions,
   config) so nothing is double-applied or downgraded.
+
+### Find the task the change is meant to do
+
+A change can be bug-free and still not do what was asked. Find the Jira ticket before reading the
+code, so you review against the task and not only against the code's own idea of itself.
+
+- **Get the key** from the commit messages, the branch name or the MR title/description (e.g.
+  `INFRASTRUCTURE-14718`, `WEBSITE-5547`, `infrastructure_14718` → `INFRASTRUCTURE-14718`). If
+  there are several keys, read all of them.
+- **Fetch it if you have access.** Use the Atlassian MCP tools (`getJiraIssue`, and
+  `listJiraIssueComments` for comments). If they appear only as deferred tools, load them with
+  ToolSearch first. Read the summary, the description, the acceptance criteria, the linked issues
+  and the comments. Comments often narrow or change the original ask.
+- **No key, or no access** (tool missing, auth fails, issue not found): do not stop or ask the
+  user. Review against the commit or MR description and record "ticket not checked: <reason>"
+  under *Not reviewed*.
+- **Subagent reviews**: subagents may not have Atlassian access. Fetch the ticket yourself and
+  paste its summary, description, acceptance criteria and relevant comments into the subagent's
+  prompt.
+
+Then write down, in your own words, the list of things the ticket asks for. Step 5 checks the
+change against this list.
 
 ## 2. Read for understanding first
 
@@ -151,9 +173,20 @@ still be critical. The verdict follows from the groups: any critical finding mea
 If the only findings are non-critical, the verdict is "approve", or "approve after X" if one of
 them should land in this MR.
 
+**Does it meet the task?** Before sorting findings, go through the ticket's list of asks from step
+1 and mark each one done, partly done or missing. Also note anything the change does that the
+ticket did not ask for. A required ask that is missing or done wrong is critical, because the
+change does not do what it claims. A partly done ask that the ticket allows to be split, and
+unrequested extra scope, are non-critical unless they break something.
+
 ```
 **Reviewed at:** <sha> (<independent | self-review, not independent>)
+**Ticket:** <KEY — summary | not checked: reason>
 **Verdict:** <approve / approve after X / needs changes> — one sentence why.
+
+### Task coverage
+- <ask from the ticket> — done | partly: <what's missing> | missing
+- Not asked for: <extra changes, or "nothing">
 
 ### Critical findings (block merge)
 1. **<claim>** — `path:line` · CONFIRMED|SUSPECTED
