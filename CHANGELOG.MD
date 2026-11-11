@@ -7,6 +7,12 @@ Add new entries under "Unreleased" and move them under a dated heading when they
 
 ### Added
 - `CHANGELOG.MD` to track changes.
+- `review-mr`: batch review of several MRs with a summary table; subagent per MR from 4 up.
+- `review-mr`: inline diff comments on post (`post-mr-inline.sh`).
+- `review-mr`: "approve" adds the user as Reviewer and approves at the reviewed SHA (`approve-mr.sh`).
+
+### Changed
+- `review-mr`: `fetch-mr.sh` falls back to SSH when an https origin has no git credentials.
 
 ## 2026-11-05
 

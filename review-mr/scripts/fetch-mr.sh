@@ -5,6 +5,8 @@
 # Usage: fetch-mr.sh <mr-number|branch|mr-url> [repo-dir]
 # An MR URL (https://host/group/project/-/merge_requests/254[/diffs...]) names the project too:
 # the clone is looked up as repo-dir itself, then its sibling directories, by origin.
+# An https origin with no git credentials (common when only an API token exists) falls back to
+# the same project over SSH (git@host:path.git), without changing the clone's remote config.
 # Exit:  0 found · 2 not found in this repo (or no local clone of the URL's project)
 #        · 1 usage/git error, or origin unreachable (REMOTE_UNREACHABLE)
 set -euo pipefail
@@ -40,9 +42,22 @@ g() { git -C "$repo" "$@"; }
 
 g rev-parse --git-dir >/dev/null
 origin=$(g remote get-url origin)
+export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh -o BatchMode=yes -o ConnectTimeout=10}"
+remote=origin   # what ls-remote/fetch talk to: the origin name, or the SSH URL fallback
+if ! probe=$(g ls-remote origin HEAD 2>&1); then
+  if [[ "$origin" =~ ^https?:// ]] && gl_origin_parse "$repo" 2>/dev/null \
+     && g ls-remote "git@$GL_HOST:$GL_PATH.git" HEAD >/dev/null 2>&1; then
+    remote="git@$GL_HOST:$GL_PATH.git"
+    echo "SSH_FALLBACK: $origin unreachable over https, using $remote"
+  else
+    echo "REMOTE_UNREACHABLE: $origin (git ls-remote failed: network/VPN or git credentials; SSH fallback failed too)"
+    printf '%s\n' "$probe" | tail -2 | sed 's/^/  /'
+    exit 1
+  fi
+fi
 base_branch=$(g symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)
 if [ -z "$base_branch" ]; then
-  for b in master main; do g ls-remote --exit-code --heads origin "$b" >/dev/null 2>&1 && { base_branch=$b; break; }; done
+  for b in master main; do g ls-remote --exit-code --heads "$remote" "$b" >/dev/null 2>&1 && { base_branch=$b; break; }; done
 fi
 
 if [[ "$target" =~ ^[0-9]+$ ]]; then
@@ -53,7 +68,7 @@ else
   local_ref="refs/remotes/origin/$target"
 fi
 
-if ! ls_out=$(g ls-remote origin "$ref" 2>&1); then
+if ! ls_out=$(g ls-remote "$remote" "$ref" 2>&1); then
   echo "REMOTE_UNREACHABLE: $origin (git ls-remote failed: network/VPN or git credentials)"
   printf '%s\n' "$ls_out" | tail -2 | sed 's/^/  /'
   exit 1
@@ -62,14 +77,14 @@ head_sha=$(printf '%s\n' "$ls_out" | awk -v r="$ref" '$2 == r {print $1}')
 if [ -z "$head_sha" ]; then
   echo "NOT_FOUND: $ref in $origin"
   if [[ "$target" =~ ^[0-9]+$ ]]; then
-    last=$(g ls-remote origin 'refs/merge-requests/*/head' 2>/dev/null \
+    last=$(g ls-remote "$remote" 'refs/merge-requests/*/head' 2>/dev/null \
       | sed -n 's#.*refs/merge-requests/\([0-9]*\)/head#\1#p' | sort -n | tail -1)
     echo "HIGHEST_MR_IN_REPO: ${last:-none}"
   fi
   exit 2
 fi
 
-g fetch -q origin "+$ref:$local_ref" "+refs/heads/$base_branch:refs/remotes/origin/$base_branch" 2>/dev/null \
+g fetch -q "$remote" "+$ref:$local_ref" "+refs/heads/$base_branch:refs/remotes/origin/$base_branch" 2>/dev/null \
   || { echo "FETCH_FAILED: $ref"; exit 1; }
 mb=$(g merge-base "refs/remotes/origin/$base_branch" "$local_ref")
 
@@ -78,7 +93,7 @@ echo "MR_REF:      $ref -> $local_ref"
 echo "HEAD:        $head_sha"
 echo "ASSUMED_BASE: origin/$base_branch (merge-base $mb)"
 echo "SOURCE_BRANCHES:"
-g ls-remote --heads origin 2>/dev/null | awk -v s="$head_sha" '$1==s {sub("refs/heads/","  ",$2); print $2}'
+g ls-remote --heads "$remote" 2>/dev/null | awk -v s="$head_sha" '$1==s {sub("refs/heads/","  ",$2); print $2}'
 if g merge-base --is-ancestor "$local_ref" "refs/remotes/origin/$base_branch"; then
   echo "STATE: already merged into origin/$base_branch"
 fi
