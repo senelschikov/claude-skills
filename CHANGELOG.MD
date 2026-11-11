@@ -5,6 +5,8 @@ Add new entries under "Unreleased" and move them under a dated heading when they
 
 ## Unreleased
 
+## 2026-11-11
+
 ### Added
 - `CHANGELOG.MD` to track changes.
 - `review-mr`: batch review of several MRs with a summary table; subagent per MR from 4 up.
