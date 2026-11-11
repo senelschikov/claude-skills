@@ -20,6 +20,8 @@ the general checks in step 3:
 | Airflow DAGs, KPO tasks, ETL / data loading / cost or usage aggregation, sqlglot | `references/airflow-dags.md` |
 | Ansible roles/playbooks/inventory, Jinja templates, systemd units, cron, shell scripts deployed to hosts | `references/ansible.md` |
 | Prometheus/VictoriaMetrics exporters, textfile collectors, vmalert/Prometheus alert rules, metric labels | `references/prometheus-alerting.md` |
+| Terragrunt/OpenTofu units and stacks, Terraform modules, k8s-clusters namespaces (helm values, quotas, NetworkPolicies, SealedSecrets) | `references/terragrunt.md` |
+| Puppet manifests, ERB/EPP templates, files a Puppet module deploys, Hiera data (nginx_wrapper, cicd_settings, DNS records) | `references/puppet-hiera.md` |
 
 If no file matches, the general checks are the whole checklist. When a review turns up a class of
 bug that is specific to a domain and likely to recur, propose adding it to that domain's file (or

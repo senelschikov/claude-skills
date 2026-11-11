@@ -5,6 +5,10 @@ Add new entries under "Unreleased" and move them under a dated heading when they
 
 ## Unreleased
 
+### Added
+- `review`: domain checklists for Terragrunt/OpenTofu units and k8s namespaces
+  (`references/terragrunt.md`) and Puppet modules with Hiera data (`references/puppet-hiera.md`).
+
 ## 2026-11-11
 
 ### Added
